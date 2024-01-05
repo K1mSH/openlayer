@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="boot.semipig.mapper.BusinessMapper">
+    <insert id="insertUser" parameterType="JoinDto">
+        select r.splore_no as splore_no
+        , r.anals_year as anals_year
+
+        from pr_splore where splore_no = r.splore_no) as crop_a
+        , STRING_AGG(DETECT_AGCHM::varchar,',') AS DETECT_AGCHM
+        from
+        (
+        select a.detect_agchm as detect_agchm
+        , a.anals_year as anals_year
+        , a.anals_era as anals_era
+        , a.splore_no as splore_no
+        , a.avg_dnsty as avg_dnsty
+        , a.max_dnsty as max_dnsty
+        , (case when least(b.fish_lc50, b.algae_lc50, b.daphnia_lc50) is null then 0 else least(b.fish_lc50, b.algae_lc50, b.daphnia_lc50) end)*1000 as water_lc50
+        , (case when least(b.fish_noec, b.algae_noec, b.daphnia_noec) is null then 0 else least(b.fish_noec, b.algae_noec, b.daphnia_noec) end)*1000 as water_noec
+        , (case
+        when b.fish_noec is not null and b.algae_noec is not null and b.daphnia_noec is not null then (least(b.fish_noec, b.algae_noec, b.daphnia_noec)/10)*1000
+        when (b.fish_noec is not null and b.algae_noec is not null and b.daphnia_noec is null)
+        or (b.fish_noec is not null and b.algae_noec is null and b.daphnia_noec is not null)
+        or (b.fish_noec is null and b.algae_noec is not null and b.daphnia_noec is not null)
+        then (least(b.fish_noec, b.algae_noec, b.daphnia_noec)/50)*1000
+        when (b.fish_noec is not null and b.algae_noec is null and b.daphnia_noec is null)
+        or (b.fish_noec is null and b.algae_noec is null and b.daphnia_noec is not null)
+        or (b.fish_noec is null and b.algae_noec is not null and b.daphnia_noec is null)
+        then (least(b.fish_noec, b.algae_noec, b.daphnia_noec)/100)*1000
+        when (b.fish_noec is null and b.algae_noec is null and b.daphnia_noec is null) and (least(b.fish_lc50, b.algae_lc50, b.daphnia_lc50) is not null) then (least(b.fish_lc50, b.algae_lc50, b.daphnia_lc50)/1000)*1000
+        else 0
+        end
+        ) as water_pnec
+        , (case when b.fish_lc50 is null then 0 else b.fish_lc50 end)*1000 as fish_lc50
+        , (case when b.algae_lc50 is null then 0 else b.algae_lc50 end)*1000 as algae_lc50
+        , (case when b.daphnia_lc50 is null then 0 else b.daphnia_lc50 end)*1000 as daphnia_lc50
+        , (case when b.fish_noec is null then 0 else b.fish_noec end)*1000 as fish_noec
+        , (case when b.algae_noec is null then 0 else b.algae_noec end)*1000 as algae_noec
+        , (case when b.daphnia_noec is null then 0 else b.daphnia_noec end)*1000 as daphnia_noec
+        , (case when b.earthworms_ec50 is null then 0 else b.earthworms_ec50 end) as soil_ec50
+        , (case when b.earthworms_noec is null then 0 else b.earthworms_noec end) as soil_noec
+        , (case when b.earthworms_noec is not null then (b.earthworms_noec/10)
+        when b.earthworms_noec is null and b.earthworms_ec50 is not null then (b.earthworms_ec50/1000)
+        else 0
+        end) as soil_pnec
+        from (
+        select t.detect_agchm as detect_agchm
+        , t.anals_era as anals_era
+        , t.anals_year as anals_year
+        , avg(t.detect_dnsty::NUMERIC) as avg_dnsty
+        , max(t.detect_dnsty::NUMERIC) as max_dnsty
+        , t.splore_no as splore_no
+        from (
+        select z.*
+        from pr_agchm_year y, pr_mntrng_result z
+        WHERE y.agchm_nm = z.detect_agchm
+        and z.detect_dnsty::NUMERIC > 0.003
+        and z.use_at='Y'
+        and z.delete_at='N'
+        and z.anals_year = #{searchYear}
+        and y.year = #{searchYear}
+        and y.se = #{lrgeClCode}
+        and z.lrge_cl_code = #{lrgeClCode}
+        and z.detect_dnsty is not null
+        ]]>
+        <if test="searchMiddlClCode != null and searchMiddlClCode != '' " ><![CDATA[AND z.middl_cl_code = #{searchMiddlClCode}]]></if>
+        <if test="groupId != 'GROUP_00000000000000'"><![CDATA[AND z.SE = #{groupId}]]></if>
+        <if test="groupId != 'GROUP_00000000000000'"><![CDATA[AND z.USE_AT = 'Y']]></if>
+        <if test="searchAnalsEra != null and searchAnalsEra != ''"><![CDATA[AND z.ANALS_ERA = #{searchAnalsEra}]]></if>
+        <if test="searchTxt != null and type=='agchm'"><![CDATA[AND LOWER(TRIM(z.DETECT_AGCHM)) LIKE CONCAT ('%', LOWER(TRIM(#{searchTxt})),'%')]]></if>
+        <if test="searchTxt != null and type=='area'"><![CDATA[AND LOWER(TRIM(z.SIDO||z.SIGNGU||z.ADRES)) LIKE CONCAT ('%', LOWER(TRIM(#{searchTxt})),'%')]]></if>
+        <![CDATA[
+				)t
+				group by t.detect_agchm, t.anals_year, t.anals_era, t.splore_no
+			) a
+			left join
+			(
+				select ppdb_b
+					, (case when ppdb_du = '' or ppdb_du is null then null else ppdb_du end)::NUMERIC as fish_lc50
+					, (case when ppdb_ev = '' or ppdb_ev is null then null else ppdb_ev end)::NUMERIC as algae_lc50
+					, (case when ppdb_ea = '' or ppdb_ea is null then null else ppdb_ea end)::NUMERIC as daphnia_lc50
+					, (case when ppdb_dx = '' or ppdb_dx is null then null else ppdb_dx end)::NUMERIC as fish_noec
+					, (case when ppdb_ey = '' or ppdb_ey is null then null else ppdb_ey end)::NUMERIC as algae_noec
+					, (case when ppdb_ed = '' or ppdb_ed is null then null else ppdb_ed end)::NUMERIC as daphnia_noec
+					, (case when ppdb_di = '' or ppdb_di is null then null else ppdb_di end)::NUMERIC as earthworms_ec50
+					, (case when ppdb_dl = '' or ppdb_dl is null then null else ppdb_dl end)::NUMERIC as earthworms_noec
+				from pr_agchm_chartr
+			) b
+			on upper(trim(b.ppdb_b)) = upper(trim(a.detect_agchm))
+	) r
+	where r.splore_no != ''
+	and r.soil_pnec != 0
+	group by r.splore_no, r.anals_year, r.anals_era
+	order by r.splore_no::NUMERIC, r.anals_year::NUMERIC ,r.anals_era::NUMERIC
+	]]>
+    </insert>
+</mapper>

@@ -4,11 +4,11 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 
 @Controller
-public class HomeController {
+public class ChartController {
 
-    @GetMapping("/home")
-    public String viewHome(){
-        System.out.println("home");
-        return "views/home.jsp";
+    @GetMapping("/chart")
+    public String viewC3Chart(){
+        return "views/c3chart/c3chart";
     }
+
 }
